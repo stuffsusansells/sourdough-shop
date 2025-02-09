@@ -1,0 +1,160 @@
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, Check, Lock, Calendar, ImageIcon } from 'lucide-react';
+import { getInventory, updateInventory, submitOrder } from '../pages/api/sheets';
+
+// ... (keep all the existing constants and component definitions until the AdminInterface)
+
+const AdminInterface = ({ inventory, setInventory, setIsAdmin, pickupDate, setPickupDate }) => {
+  const handleInventoryChange = async (breadId, field, value) => {
+    const newInventory = inventory.map(item => {
+      if (item.breadId === breadId) {
+        return { 
+          ...item, 
+          [field]: field === 'available' ? value : 
+                  field === 'quantity' ? Math.max(0, parseInt(value) || 0) : 
+                  value 
+        };
+      }
+      return item;
+    });
+    
+    setInventory(newInventory);
+    
+    try {
+      await updateInventory(newInventory);
+    } catch (error) {
+      console.error('Error updating inventory:', error);
+      // You might want to show an error message to the admin
+    }
+  };
+
+  // ... (rest of AdminInterface remains the same)
+};
+
+const OrderForm = ({ inventory, setIsAdmin, pickupDate }) => {
+  // ... (keep existing state definitions)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.name.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+    if (!formData.phone.trim()) {
+      setError('Please enter your phone number');
+      return;
+    }
+    if (!formData.orders.some(order => order.quantity > 0)) {
+      setError('Please select at least one bread option');
+      return;
+    }
+
+    try {
+      const orderData = {
+        name: formData.name,
+        phone: formData.phone,
+        orders: formData.orders.filter(order => order.quantity > 0),
+        pickupDate,
+        total: calculateTotal(),
+        timestamp: new Date().toISOString()
+      };
+
+      await submitOrder(orderData);
+      setSubmitted(true);
+      setError('');
+    } catch (error) {
+      console.error('Error submitting order:', error);
+      setError('There was an error submitting your order. Please try again.');
+    }
+  };
+
+  // ... (rest of OrderForm remains the same)
+};
+
+const SourdoughShop = () => {
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [pickupDate, setPickupDate] = useState(() => {
+    const today = new Date();
+    today.setDate(today.getDate() + 1);
+    return today.toISOString().split('T')[0];
+  });
+  const [inventory, setInventory] = useState([]);
+
+  useEffect(() => {
+    const loadInventory = async () => {
+      try {
+        setLoading(true);
+        const response = await getInventory();
+        if (response.status === 'success') {
+          setInventory(response.inventory);
+        } else {
+          setError('Failed to load inventory');
+        }
+      } catch (error) {
+        console.error('Error loading inventory:', error);
+        setError('Failed to load inventory');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInventory();
+  }, []);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    const password = e.target.password.value;
+    if (password === ADMIN_PASSWORD) {
+      setIsAuthenticated(true);
+      setLoginError('');
+    } else {
+      setLoginError('Incorrect password');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-md mx-auto p-6 text-center">
+        Loading...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-md mx-auto p-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (isAdmin && !isAuthenticated) {
+    return <LoginForm onLogin={handleLogin} error={loginError} />;
+  }
+
+  return isAdmin ? (
+    <AdminInterface 
+      inventory={inventory} 
+      setInventory={setInventory}
+      setIsAdmin={setIsAdmin}
+      pickupDate={pickupDate}
+      setPickupDate={setPickupDate}
+    />
+  ) : (
+    <OrderForm 
+      inventory={inventory}
+      setIsAdmin={setIsAdmin}
+      pickupDate={pickupDate}
+    />
+  );
+};
+
+export default SourdoughShop;

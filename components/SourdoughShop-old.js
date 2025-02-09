@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AlertCircle, Check, Lock, Calendar, ImageIcon } from 'lucide-react';
-import { getInventory, updateInventory, submitOrder } from '../pages/api/sheets';
 
 const ADMIN_PASSWORD = 'sourdough123'; // In a real app, this would be securely stored
 
@@ -60,8 +59,8 @@ const LoginForm = ({ onLogin, error }) => (
 );
 
 const AdminInterface = ({ inventory, setInventory, setIsAdmin, pickupDate, setPickupDate }) => {
-  const handleInventoryChange = async (breadId, field, value) => {
-    const newInventory = inventory.map(item => {
+  const handleInventoryChange = (breadId, field, value) => {
+    setInventory(prev => prev.map(item => {
       if (item.breadId === breadId) {
         return { 
           ...item, 
@@ -71,16 +70,7 @@ const AdminInterface = ({ inventory, setInventory, setIsAdmin, pickupDate, setPi
         };
       }
       return item;
-    });
-    
-    setInventory(newInventory);
-    
-    try {
-      await updateInventory(newInventory);
-    } catch (error) {
-      console.error('Error updating inventory:', error);
-      // You might want to show an error message to the admin
-    }
+    }));
   };
 
   return (
@@ -201,7 +191,7 @@ const OrderForm = ({ inventory, setIsAdmin, pickupDate }) => {
     }, 0);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     
     if (!formData.name.trim()) {
@@ -217,23 +207,16 @@ const OrderForm = ({ inventory, setIsAdmin, pickupDate }) => {
       return;
     }
 
-    try {
-      const orderData = {
-        name: formData.name,
-        phone: formData.phone,
-        orders: formData.orders.filter(order => order.quantity > 0),
-        pickupDate,
-        total: calculateTotal(),
-        timestamp: new Date().toISOString()
-      };
+    // Here you would typically send the data to your backend
+    console.log('Order submitted:', {
+      ...formData,
+      pickupDate,
+      total: calculateTotal(),
+      timestamp: new Date().toISOString()
+    });
 
-      await submitOrder(orderData);
-      setSubmitted(true);
-      setError('');
-    } catch (error) {
-      console.error('Error submitting order:', error);
-      setError('There was an error submitting your order. Please try again.');
-    }
+    setSubmitted(true);
+    setError('');
   };
 
   if (submitted) {
@@ -369,85 +352,45 @@ const SourdoughShop = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginError, setLoginError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [pickupDate, setPickupDate] = useState(() => {
     const today = new Date();
-    today.setDate(today.getDate() + 1);
+    today.setDate(today.getDate() + 1); // Default to tomorrow
     return today.toISOString().split('T')[0];
   });
-  const [inventory, setInventory] = useState([]);
-
-  useEffect(() => {
-    const loadInventory = async () => {
-      try {
-        setLoading(true);
-        const response = await getInventory();
-        if (response.status === 'success') {
-          setInventory(response.inventory);
-        } else {
-          setError('Failed to load inventory');
-        }
-      } catch (error) {
-        console.error('Error loading inventory:', error);
-        setError('Failed to load inventory');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadInventory();
-  }, []);
+  const [inventory, setInventory] = useState(
+    ALL_BREAD_OPTIONS.map(bread => ({
+      breadId: bread.id,
+      available: false,
+      quantity: 0,
+      imageUrl: ''
+    }))
+  );
 
   const handleLogin = (e) => {
     e.preventDefault();
     const password = e.target.password.value;
-    
     if (password === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
       setLoginError('');
     } else {
-      setLoginError('Invalid password');
+      setLoginError('Incorrect password');
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="max-w-md mx-auto p-6">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
 
   if (isAdmin && !isAuthenticated) {
     return <LoginForm onLogin={handleLogin} error={loginError} />;
   }
 
-  if (isAdmin && isAuthenticated) {
-    return (
-      <AdminInterface
-        inventory={inventory}
-        setInventory={setInventory}
-        setIsAdmin={setIsAdmin}
-        pickupDate={pickupDate}
-        setPickupDate={setPickupDate}
-      />
-    );
-  }
-
-  return (
-    <OrderForm
+  return isAdmin ? (
+    <AdminInterface 
+      inventory={inventory} 
+      setInventory={setInventory}
+      setIsAdmin={setIsAdmin}
+      pickupDate={pickupDate}
+      setPickupDate={setPickupDate}
+    />
+  ) : (
+    <OrderForm 
       inventory={inventory}
       setIsAdmin={setIsAdmin}
       pickupDate={pickupDate}
