@@ -61,25 +61,48 @@ const LoginForm = ({ onLogin, error }) => (
 
 const AdminInterface = ({ inventory, setInventory, setIsAdmin, pickupDate, setPickupDate }) => {
   const handleInventoryChange = async (breadId, field, value) => {
-    const newInventory = inventory.map(item => {
-      if (item.breadId === breadId) {
-        return { 
-          ...item, 
-          [field]: field === 'available' ? value : 
-                  field === 'quantity' ? Math.max(0, parseInt(value) || 0) : 
-                  value 
-        };
+    // Find existing inventory item or create a new one
+    let existingItemIndex = inventory.findIndex(item => item.breadId === breadId);
+    
+    if (existingItemIndex === -1 && field === 'available' && value === true) {
+      // Create new inventory item when checking the box
+      const newItem = {
+        breadId: breadId,
+        available: true,
+        quantity: 0,
+        imageUrl: ''
+      };
+      const newInventory = [...inventory, newItem];
+      setInventory(newInventory);
+      
+      try {
+        await updateInventory(newInventory);
+      } catch (error) {
+        console.error('Error updating inventory:', error);
       }
-      return item;
-    });
-    
-    setInventory(newInventory);
-    
-    try {
-      await updateInventory(newInventory);
-    } catch (error) {
-      console.error('Error updating inventory:', error);
-      // You might want to show an error message to the admin
+    } else if (existingItemIndex >= 0) {
+      // Update existing inventory item
+      const newInventory = inventory.map(item => {
+        if (item.breadId === breadId) {
+          return {
+            ...item,
+            [field]: field === 'available' ? value :
+                    field === 'quantity' ? Math.max(0, parseInt(value) || 0) :
+                    value
+          };
+        }
+        return item;
+      });
+      
+      // If making unavailable, you might want to retain the item but mark it unavailable
+      // rather than removing it completely
+      setInventory(newInventory);
+      
+      try {
+        await updateInventory(newInventory);
+      } catch (error) {
+        console.error('Error updating inventory:', error);
+      }
     }
   };
 
@@ -135,14 +158,14 @@ const AdminInterface = ({ inventory, setInventory, setIsAdmin, pickupDate, setPi
                     </label>
                     <span className="text-sm text-gray-500">${bread.price}</span>
                   </div>
-                  {inventoryItem?.available && (
+                  {(inventoryItem?.available || false) && (
                     <div className="space-y-2">
                       <div>
                         <label className="block text-sm text-gray-600">Available Quantity:</label>
                         <input
                           type="number"
                           min="0"
-                          value={inventoryItem.quantity || 0}
+                          value={inventoryItem?.quantity || 0}
                           onChange={(e) => handleInventoryChange(bread.id, 'quantity', e.target.value)}
                           className="w-24 p-1 border rounded mt-1"
                         />
@@ -151,7 +174,7 @@ const AdminInterface = ({ inventory, setInventory, setIsAdmin, pickupDate, setPi
                         <label className="block text-sm text-gray-600">Image URL:</label>
                         <input
                           type="text"
-                          value={inventoryItem.imageUrl || ''}
+                          value={inventoryItem?.imageUrl || ''}
                           onChange={(e) => handleInventoryChange(bread.id, 'imageUrl', e.target.value)}
                           className="w-full p-1 border rounded mt-1"
                           placeholder="Enter image URL"
@@ -168,6 +191,7 @@ const AdminInterface = ({ inventory, setInventory, setIsAdmin, pickupDate, setPi
     </div>
   );
 };
+
 
 const OrderForm = ({ inventory, setIsAdmin, pickupDate }) => {
   const [formData, setFormData] = useState({
