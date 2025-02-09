@@ -166,7 +166,6 @@ const AdminInterface = ({
       </div>
     </div>
   );
-};
   // Rest of AdminInterface remains the same...
 };
 
@@ -388,7 +387,6 @@ const OrderForm = ({ inventory, setIsAdmin, pickupDate, refreshInventory }) => {
       </div>
     </div>
   );
-};
 
   // Rest of OrderForm remains the same...
 };
