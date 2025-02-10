@@ -1,4 +1,7 @@
 // ... previous imports and constants remain the same ...
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, Check, Lock, Calendar, ImageIcon } from 'lucide-react';
+import { getInventory, updateInventory, submitOrder } from '../pages/api/sheets';
 
 const AdminInterface = ({ 
   inventory, 
